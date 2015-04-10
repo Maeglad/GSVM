@@ -335,10 +335,10 @@ public class GUI implements Runnable{
             @Override
             public void stateChanged(ChangeEvent e) {
                 double value = ((Integer) rotateZ.getValue()).doubleValue();
-                canvas.rotateYMatrix.matrix[0][0] = Math.cos((value/180)*Math.PI);
-                canvas.rotateYMatrix.matrix[0][1] = -Math.sin((value/180)*Math.PI);
-                canvas.rotateYMatrix.matrix[1][0] = Math.sin((value/180)*Math.PI);
-                canvas.rotateYMatrix.matrix[1][1] = Math.cos((value/180)*Math.PI);
+                canvas.rotateZMatrix.matrix[0][0] = Math.cos((value/180)*Math.PI);
+                canvas.rotateZMatrix.matrix[0][1] = -Math.sin((value/180)*Math.PI);
+                canvas.rotateZMatrix.matrix[1][0] = Math.sin((value/180)*Math.PI);
+                canvas.rotateZMatrix.matrix[1][1] = Math.cos((value/180)*Math.PI);
                 
                 canvas.repaint();
             }
