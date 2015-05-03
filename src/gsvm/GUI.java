@@ -11,6 +11,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
+import java.awt.Polygon;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
@@ -25,6 +26,7 @@ import javafx.stage.FileChooser;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JColorChooser;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -41,7 +43,6 @@ import javax.swing.event.ChangeListener;
  */
 public class GUI implements Runnable{
     
-    
     /**
      *  Classa je skopirovana z https://docs.oracle.com/javase/tutorial/uiswing/components/spinner.html
      * a pozmenena mnou
@@ -49,6 +50,7 @@ public class GUI implements Runnable{
      */
     class CyclingSpinnerNumberModel extends SpinnerNumberModel {
         Object firstValue, lastValue;
+        
 
         public CyclingSpinnerNumberModel(int val, int min, int max, int step) {
             super(val, min, max, step);
@@ -78,20 +80,26 @@ public class GUI implements Runnable{
     
     class GraphicPanel extends JPanel{
         Matrix scaleMatrix, transMatrix, rotateXMatrix, rotateYMatrix, rotateZMatrix, rotateMatrix, comboMatrix;
+        Matrix finalMatrix;
         ArrayList<Stena> steny;
         ArrayList<Point> body;
+        boolean hide = false;
+        boolean drawcolor = false;
+        Color color = Color.RED;
+        
+        Point light = new Point(0,0,0,1);
         public GraphicPanel() {
-            scaleMatrix = new Matrix(new double[][]{
+            finalMatrix = new Matrix(new double[][]{
                                                     {100, 0, 0, 0},
                                                     {0, 100, 0, 0},
                                                     {0, 0, 100, 0},
-                                                    {0, 0, 0, 1}
+                                                    {300, 200, 0, 1}
                                                    });
             transMatrix = new Matrix(new double[][]{
                                                     {1, 0, 0, 0},
                                                     {0, 1, 0, 0},
                                                     {0, 0, 1, 0},
-                                                    {300, 200, 0 ,1}
+                                                    {0, 0, 0 ,1}
                                                    });
             rotateXMatrix = new Matrix(new double[][]{
                                                     {1, 0, 0, 0},
@@ -117,6 +125,12 @@ public class GUI implements Runnable{
                                                     {0, 0, 1, 0},
                                                     {0, 0, 0 ,1}
                                                    });
+            scaleMatrix = new Matrix(new double[][]{
+                                                    {1, 0, 0, 0},
+                                                    {0, 1, 0, 0},
+                                                    {0, 0, 1, 0},
+                                                    {0, 0, 0 ,1}
+                                                   });
             comboMatrix = new Matrix(new double[4][4]);
             steny = new ArrayList<Stena>();
             body = new ArrayList<Point>();
@@ -133,36 +147,87 @@ public class GUI implements Runnable{
             comboMatrix = Matrix.multiply(scaleMatrix, transMatrix);
             ArrayList<Point> tmpBody = new ArrayList<Point>();
             ArrayList<Point> tmp2Body = new ArrayList<Point>();
+            // order ma byt scale rotate translate #robisToZle
             rotateMatrix = Matrix.multiply(rotateXMatrix, Matrix.multiply(rotateYMatrix, rotateZMatrix));
+            comboMatrix = Matrix.multiply(scaleMatrix, rotateMatrix);
+            comboMatrix = Matrix.multiply(comboMatrix, transMatrix);
             for(Point p : body){
-                tmpBody.add(Matrix.multiply(p, rotateMatrix));
+                tmpBody.add(Matrix.multiply(p, comboMatrix));
+            }
+            
+            for(Stena s : steny){
+                s.computeCenter(tmpBody);
+                s.computeNormal(tmpBody);
             }
             
             for(Point p : tmpBody){
-                tmp2Body.add(Matrix.multiply(p, comboMatrix));
+                tmp2Body.add(Matrix.multiply(p, finalMatrix));
             }
-            
             for(Point p : tmp2Body){
-                //System.err.println(p);
+                System.err.println(p);      
                 p.suradnice[1] = 400 - p.suradnice[1];
                 //System.err.println(p);
             }
+            System.err.println();
             
             g.setColor(Color.white);
             g.fillRect(0, 0, this.getWidth(), this.getHeight());
             g.setColor(Color.black);
             g.drawRect(0, 0, this.getWidth()-1, this.getHeight()-1);
-            for(Stena s : steny){
-                ArrayList<Integer> order = s.getPoints();
-                for(int i = 0; i < order.size(); ++i){
-                    g.drawLine((int)tmp2Body.get(order.get(i)).suradnice[0],
-                               (int)tmp2Body.get(order.get(i)).suradnice[1],
-                               (int)tmp2Body.get(order.get((i+1)%order.size())).suradnice[0],
-                               (int)tmp2Body.get(order.get((i+1)%order.size())).suradnice[1]);
-                    
-                    
+                for(Stena s : steny){
+                    if(hide)
+                        if(s.getNormal().suradnice[2] <0) continue;
+                    ArrayList<Integer> order = s.getPoints();
+                    for(int i = 0; i < order.size(); ++i){
+                        g.drawLine((int)tmp2Body.get(order.get(i)).suradnice[0],
+                                   (int)tmp2Body.get(order.get(i)).suradnice[1],
+                                   (int)tmp2Body.get(order.get((i+1)%order.size())).suradnice[0],
+                                   (int)tmp2Body.get(order.get((i+1)%order.size())).suradnice[1]);
+
+
+                    }
+                    if(drawcolor){
+                            int[] sx = new int[order.size()];
+                            int[] sy = new int[order.size()];
+                            
+                            for(int i = 0; i < order.size(); ++i){
+                                Point p = tmp2Body.get(order.get(i));
+                                sx[i] = (int) p.suradnice[0];
+                                sy[i] = (int) p.suradnice[1];
+                            }
+                            int red, green, blue;
+                            red = color.getRed();
+                            green = color.getGreen();
+                            blue = color.getBlue();
+                            
+                            Point center = s.getCenter();
+                            Point normal = s.getNormal();
+                            Point lightVector = new Point(light.suradnice[0] - center.suradnice[0],
+                                                          light.suradnice[1] - center.suradnice[1],
+                                                          light.suradnice[2] - center.suradnice[2], 
+                                                          0
+                                                         );
+                            
+                            double dot = Stena.getDotProduct(normal, lightVector);
+                            
+                            double magNormal = Math.sqrt(Stena.getDotProduct(normal, normal));
+                            double magLight = Math.sqrt(Stena.getDotProduct(lightVector, lightVector));
+                            
+                            double uhol = dot/(magNormal* magLight);
+                            
+                            red = Math.max(0, (int)(red*uhol)%255);
+                            green = Math.max(0, (int)(green*uhol)%255);
+                            blue = Math.max(0, (int)(blue*uhol)%255);
+                            
+                            if(dot < 0)g.setColor(Color.black);
+                            else g.setColor(new Color(red, green, blue));
+                            g.fillPolygon(sx, sy, order.size());
+                            g.setColor(Color.BLACK);
+                        }
+
                 }
-            }
+            
+            
         }
         
         
@@ -235,24 +300,45 @@ public class GUI implements Runnable{
             }
         });
         // pomocna vec na vypisanie bodov debug
-        JButton drawButton = new JButton("vypis body");
+        JButton drawButton = new JButton("Hide faces toggle");
         drawButton.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                for(Point p : canvas.body){
-                    System.out.println(p);
-                }
                 
-                
+                canvas.hide = !canvas.hide;
                 
                 canvas.repaint();
             }
         });
         
+        JButton colorButton = new JButton("select color");
+        colorButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Color color = JColorChooser.showDialog(null, "Choose color", Color.BLACK);
+                canvas.color = color;
+                canvas.repaint();
+            }
+        });
+        
+        JButton toggleColorButton = new JButton("toggle color");
+        toggleColorButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                
+                canvas.drawcolor = !canvas.drawcolor;
+                
+                canvas.repaint();
+            }
+        });
         
         buttonPanel.add(loadButton);
         buttonPanel.add(drawButton);
+        buttonPanel.add(toggleColorButton);
+        buttonPanel.add(colorButton);
         
         bottomPanel.add(buttonPanel);
         
@@ -267,7 +353,7 @@ public class GUI implements Runnable{
             @Override
             public void stateChanged(ChangeEvent e) {
                 // ocividne moj netbeans nedokaze castovat Integer do Double priamo aj ked na to ma funkcie
-                canvas.scaleMatrix.matrix[0][0] = ((Integer) scaleX.getValue()).doubleValue();
+                canvas.scaleMatrix.matrix[0][0] =((Integer) scaleX.getValue()).doubleValue() / 100;
                 canvas.repaint();
             }
         });
@@ -277,7 +363,7 @@ public class GUI implements Runnable{
 
             @Override
             public void stateChanged(ChangeEvent e) {
-                canvas.scaleMatrix.matrix[1][1] = ((Integer) scaleY.getValue()).doubleValue();;
+                canvas.scaleMatrix.matrix[1][1] = ((Integer) scaleY.getValue()).doubleValue() / 100;
                 canvas.repaint();
             }
         });
@@ -287,7 +373,7 @@ public class GUI implements Runnable{
 
             @Override
             public void stateChanged(ChangeEvent e) {
-                canvas.scaleMatrix.matrix[2][2] = ((Integer) scaleZ.getValue()).doubleValue();
+                canvas.scaleMatrix.matrix[2][2] = ((Integer) scaleZ.getValue()).doubleValue() / 100;
                 canvas.repaint();
             }
         });
@@ -350,13 +436,13 @@ public class GUI implements Runnable{
         JPanel transPanel = new JPanel();
         
         transPanel.setLayout(new BoxLayout(transPanel, BoxLayout.Y_AXIS));
-        JSpinner transX = new JSpinner(new SpinnerNumberModel(0, -500, 500, 10));
+        JSpinner transX = new JSpinner(new SpinnerNumberModel(0, -500, 500, 10)) ;
         transX.addChangeListener(new ChangeListener() {
 
             @Override
             public void stateChanged(ChangeEvent e) {
                 // ocividne moj netbeans nedokaze castovat Integer do Double priamo aj ked na to ma funkcie
-                canvas.transMatrix.matrix[3][0] = 300 + ((Integer) transX.getValue()).doubleValue();
+                canvas.transMatrix.matrix[3][0] = ((Integer) transX.getValue()).doubleValue() / 100;
                 canvas.repaint();
             }
         });
@@ -366,7 +452,7 @@ public class GUI implements Runnable{
 
             @Override
             public void stateChanged(ChangeEvent e) {
-                canvas.transMatrix.matrix[3][1] = 200 + ((Integer) transY.getValue()).doubleValue();;
+                canvas.transMatrix.matrix[3][1] = ((Integer) transY.getValue()).doubleValue()/100;
                 canvas.repaint();
             }
         });
@@ -376,7 +462,7 @@ public class GUI implements Runnable{
 
             @Override
             public void stateChanged(ChangeEvent e) {
-                canvas.transMatrix.matrix[3][2] =  0 + ((Integer) transZ.getValue()).doubleValue();
+                canvas.transMatrix.matrix[3][2] = ((Integer) transZ.getValue()).doubleValue()/100;
                 canvas.repaint();
             }
         });
@@ -384,6 +470,43 @@ public class GUI implements Runnable{
         transPanel.setBorder(BorderFactory.createTitledBorder("Transformation"));
         bottomPanel.add(transPanel);
         
+        JPanel lightPanel = new JPanel();
+        
+        lightPanel.setLayout(new BoxLayout(lightPanel, BoxLayout.Y_AXIS));
+        JSpinner lightX = new JSpinner(new SpinnerNumberModel(0, -500, 500, 10));
+        lightX.addChangeListener(new ChangeListener() {
+
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                // ocividne moj netbeans nedokaze castovat Integer do Double priamo aj ked na to ma funkcie
+                canvas.light.suradnice[0] = (Integer) lightX.getValue()/10;
+                canvas.repaint();
+            }
+        });
+        lightPanel.add(lightX);
+        JSpinner lightY = new JSpinner(new SpinnerNumberModel(0, -500, 500, 10));
+        lightY.addChangeListener(new ChangeListener() {
+
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                canvas.light.suradnice[1] = (Integer) lightY.getValue()/10;
+                canvas.repaint();
+            }
+        });
+        lightPanel.add(lightY);
+        JSpinner lightZ = new JSpinner(new SpinnerNumberModel(0, -500, 500, 10));
+        lightZ.addChangeListener(new ChangeListener() {
+
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                canvas.light.suradnice[2] = (Integer) lightZ.getValue()/10;
+                canvas.repaint();
+            }
+        });
+        lightPanel.add(lightZ);
+        lightPanel.setBorder(BorderFactory.createTitledBorder("Light position"));
+        
+        bottomPanel.add(lightPanel);
 //****************************************************
         
         frame.add(bottomPanel,BorderLayout.SOUTH);
