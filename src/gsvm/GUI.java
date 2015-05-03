@@ -164,11 +164,11 @@ public class GUI implements Runnable{
                 tmp2Body.add(Matrix.multiply(p, finalMatrix));
             }
             for(Point p : tmp2Body){
-                System.err.println(p);      
+                //System.err.println(p);      
                 p.suradnice[1] = 400 - p.suradnice[1];
                 //System.err.println(p);
             }
-            System.err.println();
+           // System.err.println();
             
             g.setColor(Color.white);
             g.fillRect(0, 0, this.getWidth(), this.getHeight());
@@ -292,7 +292,7 @@ public class GUI implements Runnable{
                             
                         }
                     } catch (FileNotFoundException ex) {
-                        System.err.println("File "+ file.toString() +" not found");
+                       // System.err.println("File "+ file.toString() +" not found");
                     }
                 }
                 //System.out.println("test vypis load object");
